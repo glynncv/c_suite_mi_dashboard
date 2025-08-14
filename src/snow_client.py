@@ -44,6 +44,27 @@ DEFAULT_FIELDS = [
 # Default query for MI by priority (P1/P2)
 DEFAULT_QUERY = "priorityIN1,2"
 
+def get_saved_filter_query(filter_name: str = "PYTHON: MAJOR IM") -> str:
+    """Get query from saved filter - best practice approach"""
+    
+    # Map of known saved filter names to their queries
+    saved_filters = {
+        "PYTHON: MAJOR IM": "priorityIN1,2^location.u_region=EMEA^u_resolvedBETWEENjavascript:gs.dateGenerate('2025-01-01','00:00:00')@javascript:gs.endOfToday()",
+        "SIMPLE_P1_P2": "priorityIN1,2",
+        "EMEA_HIGH_PRIORITY": "location.u_region=EMEA^priorityIN1,2"
+    }
+    
+    if filter_name in saved_filters:
+        return saved_filters[filter_name]
+    else:
+        # Fallback to default query
+        print(f"⚠️ Saved filter '{filter_name}' not found, using default query")
+        return DEFAULT_QUERY
+
+def get_complex_manual_query() -> str:
+    """Get the complex manual query as fallback (your original approach)"""
+    return """location.u_region=EMEA^u_resolved>=javascript:gs.dateGenerate('2025-01-01','00:00:00')^u_resolved<=javascript:gs.dateGenerate('2025-12-31','00:00:00')^u_resolvedISNOTEMPTY^(location!=04a8b43cdb22934c627562405b961950^ORlocation=NULL)^(location!=5de7a2eedb96f30095c41aaf299619ae^ORlocation=NULL)^(caller_id!=8183d88ddb83d0544ea59803f396195b^ORcaller_id=NULL)^priorityIN1,2^assignment_group=8d1de3be832e069831009550ceaad37a"""
+
 def _get_oauth_token() -> str:
     """Placeholder for OAuth token retrieval; return empty to fall back to Basic Auth."""
     return ""
@@ -60,11 +81,22 @@ def _get_auth_headers() -> Dict[str, str]:
         raise ValueError("No authentication provided. Set SNOW_USERNAME/SNOW_PASSWORD or OAuth creds.")
     return headers
 
-def fetch_incidents(query: str, fields: List[str] | None = None, page_size: int = 500) -> List[Dict[str, Any]]:
+def fetch_incidents(query: str = None, fields: List[str] | None = None, page_size: int = 500, use_saved_filter: bool = True) -> List[Dict[str, Any]]:
     """
     Fetch incidents using the ServiceNow Table API with paging and retry/backoff.
     Supports Basic Auth (default) and OAuth (if token provided).
+    
+    Args:
+        query: ServiceNow query string. If None and use_saved_filter=True, uses saved filter.
+        fields: List of fields to retrieve
+        page_size: Number of records per page
+        use_saved_filter: Whether to use saved filter if no query provided
     """
+    # Use saved filter by default (best practice)
+    if query is None and use_saved_filter:
+        query = get_saved_filter_query("PYTHON: MAJOR IM")
+        print(f"🔍 Using saved filter: PYTHON: MAJOR IM")
+    
     fields = fields or DEFAULT_FIELDS
     offset = 0
     results: List[Dict[str, Any]] = []

@@ -1,28 +1,20 @@
-# C‑suite MI Dashboard (ServiceNow)
+# C‑suite Major Incidents Dashboard (ServiceNow)
 
-## 1) Setup
-- Install **uv**: https://docs.astral.sh/uv/
-- `uv sync --all-extras --dev`
-- Copy `.env.example` → `.env` and fill SNOW_* values.
+## Quick Start
+1) Install deps: `uv sync --dev`
+2) Copy `.env.example` → `.env` and set SNOW_* values
+3) Run: `uv run streamlit run app/main.py`
+4) In the app sidebar: pick **CSV** (upload) or **ServiceNow API**
 
-## 2) Run (CSV demo)
-- Put a CSV at `data/sample_incidents.csv` with columns:
-  `number,priority,opened_at,resolved_at,closed_at,location,u_major_incident,...`
-- `uv run streamlit run app/main.py`
-
-## 3) Run (ServiceNow API)
-- Ensure `.env` has `SNOW_INSTANCE`, `SNOW_USERNAME`, `SNOW_PASSWORD`, `SNOW_QUERY`.
-- In the app sidebar, choose **ServiceNow API**.
-
-## 4) Tests & quality
-- `uv run ruff check .`
-- `uv run mypy src`
-- `uv run pytest -q --cov=src`
-
-## 5) Deploy
-- **Streamlit Cloud**: push to GitHub, set env vars, deploy.
-- **Docker**: `docker build -t mi-dashboard . && docker run -p 8501:8501 --env-file=.env mi-dashboard`
+## Tests
+- Offline unit tests: `uv run pytest -q`
+- Live SNOW test (requires .env): `uv run pytest -q -m integration`
 
 ## Notes
-- KPI definitions live in `src/kpis.py`. Adjust formulas (e.g., pause windows) to match policy.
-- For enterprise rollouts, move aggregates to Postgres/Snowflake and add SSO.
+- MI definition = **P1 or P2** (priority parsing handles "2 - High" strings)
+- MTTR = `resolved_at - opened_at`
+
+# Data folder
+
+- **test_incidents.csv** — Local-only ServiceNow export for testing the CSV path in the dashboard.
+- Not committed to git; add your own export here for local dev.

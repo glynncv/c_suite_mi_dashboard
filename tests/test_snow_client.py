@@ -1,9 +1,14 @@
 import responses
-from src.snow_client import fetch_incidents, SNOW_BASE, TABLE
+import os
+from src.snow_client import fetch_incidents
 
 @responses.activate
 def test_fetch_incidents_paginates():
-    url = f"{SNOW_BASE}/{TABLE}"
+    # Mock the environment variables for testing
+    os.environ['SNOW_INSTANCE'] = 'test-instance'
+    os.environ['SNOW_TABLE'] = 'incident'
+    
+    url = "https://test-instance.service-now.com/api/now/table/incident"
     # first page
     responses.add(responses.GET, url, json={"result":[{"number":"INC1"}]}, status=200)
     # second (empty) page

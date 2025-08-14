@@ -1,0 +1,9 @@
+is_major: []
+opened_at: ["opened_at"]
+resolved_at: ["u_resolved"]
+closed_at: ["closed_at"]
+priority: ["priority"]
+location: ["location"]
+
+int_like: ["priority"]
+datetime_like: ["opened_at","resolved_at","closed_at"]

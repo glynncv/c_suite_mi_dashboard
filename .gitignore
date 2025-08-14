@@ -206,3 +206,6 @@ logs/
 
 # Docker
 .dockerignore
+
+data/*.csv
+!data/README.md

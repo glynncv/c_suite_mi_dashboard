@@ -1,69 +1,80 @@
 from __future__ import annotations
 import os
 import time
-from typing import Iterator, Dict, Any, List
+from typing import Dict, Any, List
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+# Only load environment variables when actually needed
+def _load_env():
+    """Load environment variables only when needed"""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass  # dotenv not available, use system env vars
 
-SNOW_BASE = f"https://{os.getenv('SNOW_INSTANCE')}.service-now.com/api/now/table"
-TABLE = os.getenv("SNOW_TABLE", "incident")
+def _get_snow_base():
+    """Get ServiceNow base URL - only called when needed"""
+    _load_env()  # Load env vars when needed
+    instance = os.getenv('SNOW_INSTANCE')
+    if not instance:
+        raise ValueError("SNOW_INSTANCE environment variable not set")
+    return f"https://{instance}.service-now.com/api/now/table"
 
-# Authentication configuration
-SNOW_USERNAME = os.getenv("SNOW_USERNAME", "")
-SNOW_PASSWORD = os.getenv("SNOW_PASSWORD", "")
-SNOW_CLIENT_ID = os.getenv("SNOW_CLIENT_ID", "")
-SNOW_CLIENT_SECRET = os.getenv("SNOW_CLIENT_SECRET", "")
+def _get_table():
+    """Get ServiceNow table name - only called when needed"""
+    _load_env()  # Load env vars when needed
+    return os.getenv("SNOW_TABLE", "incident")
+
+def _get_credentials():
+    """Get authentication credentials - only called when needed"""
+    _load_env()  # Load env vars when needed
+    return {
+        "username": os.getenv("SNOW_USERNAME", ""),
+        "password": os.getenv("SNOW_PASSWORD", ""),
+        "client_id": os.getenv("SNOW_CLIENT_ID", ""),
+        "client_secret": os.getenv("SNOW_CLIENT_SECRET", "")
+    }
 
 DEFAULT_FIELDS = [
-    "number","priority","opened_at","u_resolved","closed_at","category",
-    "short_description","impact","urgency","location","incident_state"
+    "number", "priority", "opened_at", "u_resolved", "closed_at", "category",
+    "short_description", "impact", "urgency", "location", "incident_state"
 ]
 
-# Default query for high priority incidents (using IN operator which works in this ServiceNow instance)
+# Default query for MI by priority (P1/P2)
 DEFAULT_QUERY = "priorityIN1,2"
 
-def _get_auth_headers() -> Dict[str, str]:
-    """Get authentication headers based on available credentials"""
-    headers = {"Accept": "application/json"}
-    
-    # If OAuth credentials are available, use them
-    if SNOW_CLIENT_ID and SNOW_CLIENT_SECRET:
-        # For OAuth, we'll need to get a token first
-        # This is a simplified version - you may need to implement full OAuth flow
-        headers["Authorization"] = f"Bearer {_get_oauth_token()}"
-    elif SNOW_USERNAME and SNOW_PASSWORD:
-        # Basic auth - credentials will be passed to requests.get()
-        pass
-    else:
-        raise ValueError("No authentication credentials provided. Set either SNOW_USERNAME/SNOW_PASSWORD or SNOW_CLIENT_ID/SNOW_CLIENT_SECRET")
-    
-    return headers
-
 def _get_oauth_token() -> str:
-    """Get OAuth token from ServiceNow (simplified implementation)"""
-    # This is a placeholder - you'll need to implement the full OAuth flow
-    # For now, return empty string to fall back to basic auth
+    """Placeholder for OAuth token retrieval; return empty to fall back to Basic Auth."""
     return ""
 
+def _get_auth_headers() -> Dict[str, str]:
+    """Build headers; only attach Bearer if a non-empty token exists."""
+    headers = {"Accept": "application/json"}
+    creds = _get_credentials()
+    if creds["client_id"] and creds["client_secret"]:
+        token = _get_oauth_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    elif not (creds["username"] and creds["password"]):
+        raise ValueError("No authentication provided. Set SNOW_USERNAME/SNOW_PASSWORD or OAuth creds.")
+    return headers
+
 def fetch_incidents(query: str, fields: List[str] | None = None, page_size: int = 500) -> List[Dict[str, Any]]:
-    """Pull incidents matching an encoded query (sysparm_query).
-    Supports both Basic Auth and OAuth 2.0."""
+    """
+    Fetch incidents using the ServiceNow Table API with paging and retry/backoff.
+    Supports Basic Auth (default) and OAuth (if token provided).
+    """
     fields = fields or DEFAULT_FIELDS
     offset = 0
     results: List[Dict[str, Any]] = []
-    
-    # Get authentication headers
     headers = _get_auth_headers()
-    
-    # Prepare authentication
-    auth = None
-    if SNOW_USERNAME and SNOW_PASSWORD:
-        # Use basic auth if OAuth credentials are not properly configured
-        if not (SNOW_CLIENT_ID and SNOW_CLIENT_SECRET and SNOW_CLIENT_ID != "your_client_id" and SNOW_CLIENT_SECRET != "your_client_secret"):
-            auth = (SNOW_USERNAME, SNOW_PASSWORD)
-    
+
+    # Prefer Basic Auth unless you actually obtained a Bearer token
+    creds = _get_credentials()
+    auth = (creds["username"], creds["password"]) if (creds["username"] and creds["password"]) else None
+
+    MAX_RETRIES = 5
     while True:
         params = {
             "sysparm_query": query,
@@ -73,30 +84,39 @@ def fetch_incidents(query: str, fields: List[str] | None = None, page_size: int 
             "sysparm_limit": str(page_size),
             "sysparm_offset": str(offset),
         }
-        
-        try:
-            resp = requests.get(
-                f"{SNOW_BASE}/{TABLE}", 
-                headers=headers, 
-                params=params, 
-                auth=auth, 
-                timeout=60
-            )
-            
-            resp.raise_for_status()
-            chunk = resp.json().get("result", [])
-            
-            results.extend(chunk)
-            if len(chunk) < page_size:
-                break
-            offset += page_size
-            time.sleep(0.2)  # polite rate limiting
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 401:
-                raise Exception(f"Authentication failed. Check your ServiceNow credentials and user permissions. Error: {e}")
-            else:
-                raise e
-        except Exception as e:
-            raise e
-    
-    return results
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                resp = requests.get(
+                    f"{_get_snow_base()}/{_get_table()}",
+                    headers=headers,
+                    params=params,
+                    auth=auth,
+                    timeout=60,
+                )
+                # Backoff for rate limiting / transient server errors
+                if resp.status_code in (429, 500, 502, 503, 504):
+                    retry_after = resp.headers.get("Retry-After")
+                    wait = int(retry_after) if (retry_after and retry_after.isdigit()) else min(60, 2 ** attempt)
+                    time.sleep(wait)
+                    if attempt < MAX_RETRIES:
+                        continue
+                resp.raise_for_status()
+
+                chunk = resp.json().get("result", [])
+                results.extend(chunk)
+                if len(chunk) < page_size:
+                    return results  # no more pages
+                offset += page_size
+                time.sleep(0.2)  # polite pacing
+                break  # success -> next page
+            except requests.exceptions.HTTPError as e:
+                if e.response is not None and e.response.status_code == 401:
+                    raise Exception("Authentication failed (401). Check SNOW creds/roles.") from e
+                if attempt >= MAX_RETRIES:
+                    raise
+                time.sleep(min(60, 2 ** attempt))
+            except requests.RequestException:
+                if attempt >= MAX_RETRIES:
+                    raise
+                time.sleep(min(60, 2 ** attempt))

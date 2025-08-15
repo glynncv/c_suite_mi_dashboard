@@ -65,6 +65,44 @@ def get_complex_manual_query() -> str:
     """Get the complex manual query as fallback (your original approach)"""
     return """location.u_region=EMEA^u_resolved>=javascript:gs.dateGenerate('2025-01-01','00:00:00')^u_resolved<=javascript:gs.dateGenerate('2025-12-31','00:00:00')^u_resolvedISNOTEMPTY^(location!=04a8b43cdb22934c627562405b961950^ORlocation=NULL)^(location!=5de7a2eedb96f30095c41aaf299619ae^ORlocation=NULL)^(caller_id!=8183d88ddb83d0544ea59803f396195b^ORcaller_id=NULL)^priorityIN1,2^assignment_group=8d1de3be832e069831009550ceaad37a"""
 
+def generate_sample_incidents(count: int = 20) -> List[Dict[str, Any]]:
+    """Generate sample incident data for testing without external files.
+    
+    Args:
+        count: Number of incidents to generate (default: 20)
+    
+    Returns:
+        List of incident dictionaries with realistic test data
+    """
+    import random
+    from datetime import datetime, timedelta
+    
+    priorities = [1, 2, 3, 4, 5]
+    categories = ["Hardware", "Software", "Network", "Access", "Other"]
+    states = ["New", "In Progress", "Resolved", "Closed"]
+    
+    incidents = []
+    base_date = datetime.now() - timedelta(days=30)
+    
+    for i in range(count):
+        opened_at = base_date + timedelta(days=random.randint(0, 30))
+        resolved_at = opened_at + timedelta(hours=random.randint(1, 72))
+        
+        incident = {
+            "number": f"INC{random.randint(7000000, 7999999)}",
+            "priority": random.choice(priorities),
+            "opened_at": opened_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "u_resolved": resolved_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "category": random.choice(categories),
+            "short_description": f"Sample incident {i+1} for testing",
+            "is_major": random.choice(priorities) in [1, 2]
+        }
+        incidents.append(incident)
+    
+    return incidents
+
+
+
 def _get_oauth_token() -> str:
     """Placeholder for OAuth token retrieval; return empty to fall back to Basic Auth."""
     return ""

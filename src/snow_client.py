@@ -121,7 +121,7 @@ def _get_auth_headers() -> dict[str, str]:
         raise ValueError("No authentication provided. Set SNOW_USERNAME/SNOW_PASSWORD or OAuth creds.")
     return headers
 
-def fetch_incidents(query: str = None, fields: list[str] | None = None, page_size: int = 500, use_saved_filter: bool = True) -> list[dict[str, Any]]:
+def fetch_incidents(query: str | None = None, fields: list[str] | None = None, page_size: int = 500, use_saved_filter: bool = True) -> list[dict[str, Any]]:
     """
     Fetch incidents using the ServiceNow Table API with paging and retry/backoff.
     Supports Basic Auth (default) and OAuth (if token provided).

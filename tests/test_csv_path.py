@@ -1,7 +1,10 @@
-import pandas as pd
 import os
+
+import pandas as pd
 import pytest
+
 from src.transforms import to_dataframe
+
 
 @pytest.mark.skipif(not os.path.exists("tests/data/test_incidents.csv"), reason="CSV test file missing")
 def test_csv_file_priority_and_mi_scope():

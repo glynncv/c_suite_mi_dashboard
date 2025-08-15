@@ -1,6 +1,9 @@
-import pandas as pd
 from datetime import datetime, timezone
+
+import pandas as pd
+
 from src import kpis
+
 
 def _df():
     def ts(h): return datetime(2025, 5, 1, h, tzinfo=timezone.utc)

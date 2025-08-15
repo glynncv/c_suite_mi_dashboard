@@ -10,6 +10,8 @@ def test_fetch_incidents_paginates():
     # Mock the environment variables for testing
     os.environ['SNOW_INSTANCE'] = 'test-instance'
     os.environ['SNOW_TABLE'] = 'incident'
+    os.environ['SNOW_USERNAME'] = 'test-user'
+    os.environ['SNOW_PASSWORD'] = 'test-password'
 
     url = "https://test-instance.service-now.com/api/now/table/incident"
     # first page

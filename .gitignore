@@ -189,10 +189,15 @@ $RECYCLE.BIN/
 logs/
 *.log
 
-# Data files (uncomment if you want to ignore data files)
-# data/*.csv
-# data/*.json
-# data/*.xlsx
+# Data files - production data folder (gitignored)
+data/*.csv
+data/*.json
+data/*.xlsx
+!data/README.md
+
+# Test data - committed to git for CI/CD
+!tests/data/*.csv
+!tests/data/*.json
 
 # Temporary files
 *.tmp
@@ -206,6 +211,3 @@ logs/
 
 # Docker
 .dockerignore
-
-data/*.csv
-!data/README.md

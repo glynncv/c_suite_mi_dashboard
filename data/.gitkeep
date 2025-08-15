@@ -1,0 +1,3 @@
+# This file ensures the data/ directory is preserved in git
+# Production data files (CSV, JSON, etc.) are gitignored
+# Test data is stored in tests/data/ instead

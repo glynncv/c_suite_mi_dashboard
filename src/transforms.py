@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import pandas as pd
 
 RENAME_MAP = {
@@ -12,13 +13,13 @@ RENAME_MAP = {
 
 def to_dataframe(records: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame.from_records(records)
-    
+
     # normalise columns - only rename if the source column exists
     for k, v in RENAME_MAP.items():
         if k in df.columns:
             if k != v:  # Only rename if different
                 df[v] = df[k]
-    
+
     # Ensure opened_at exists (it should be there from ServiceNow)
     if 'opened_at' not in df.columns:
         # Try to find alternative column names
@@ -26,16 +27,16 @@ def to_dataframe(records: list[dict]) -> pd.DataFrame:
             if 'open' in col.lower() or 'created' in col.lower():
                 df['opened_at'] = df[col]
                 break
-    
+
     # types - handle ServiceNow date format "YYYY-MM-DD HH:MM:SS"
     for col in ["opened_at","resolved_at","closed_at"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], format="%Y-%m-%d %H:%M:%S", errors="coerce", utc=True)
-    
+
     for col in ["priority","impact","urgency","severity"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
-    
+
     if "is_major" in df.columns:
         df["is_major"] = df["is_major"].astype(str).str.lower().isin(["true","1","yes","y"])
     elif "priority" in df.columns:
@@ -44,5 +45,5 @@ def to_dataframe(records: list[dict]) -> pd.DataFrame:
     else:
         # If neither column exists, set all incidents as non-major
         df["is_major"] = False
-    
+
     return df
